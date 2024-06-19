@@ -1,37 +1,70 @@
-import pika
-import pika.connection
 import pygame
 
-pygame.init()
-pygame.joystick.init()
 
-broker_address = "services.vayut.com"
-port =5672
-topic="rkcmd72"
-username ="parry"
-password = "parry"
-virtual_host = "drone"
+class controller:
+    def __init__(self,id:int=None):
+        pygame.init()
+        pygame.joystick.init()
+        self.stickcount = pygame.joystick.get_count()
 
-credentials = pika.PlainCredentials(username,password)
-connection = pika.BlockingConnection(pika.ConnectionParameters(broker_address,port,virtual_host,credentials))
 
-channel = connection.channel()
+        
+    def detect_sticks(self):
+        print(f"Number of Joysticks detected: {self.stickcount}")
+        for s in  range (self.stickcount):
+            j = pygame.joystick.Joystick(s)
+            j.init()
+            print(f"{s} : {j.get_name()}, {j.get_guid()}")
+            j.quit()
 
-channel.exchange_declare(topic,topic,durable=True)
 
-try:
-	j = pygame.joystick.Joystick(0) # create a joystick instance
-	j.init() # init instance
-	print ("Enabled joystick: {0}".format(j.get_name()))
-except pygame.error:
-	print ("no joystick found.")
-data = {}
-while(1):
-    for event in pygame.event.get():
-        for i in range(12):
-            data["button"+str(i)]=j.get_button(i)
-        data["throttle"]=j.get_axis(3)*-1
-        data["x"]=j.get_axis(0)
-        data["y"]=j.get_axis(1)
-        data["z"]=j.get_axis(2)
-        channel.basic_publish(exchange=topic,routing_key=topic,body=data)
+    def init(self,id:int)->None:
+        '''
+            Initialises the connection with the joystick with the supplied id
+        '''
+
+        if(self.stickcount==0):
+            return 0
+        
+        if(id>self.stickcount-1):
+            return -1
+        
+        self.j = pygame.joystick.Joystick(id)
+        self.j.init()
+        
+    
+    def metadata(self):
+        return {"name":self.j.get_name(),"id":self.j.get_guid()}
+    
+    def getbutton(self,i):
+        return self.j.get_button(i)
+    
+  
+        
+class Extreme3dPro(controller):
+
+    roll = 0
+    pitch = 0
+    yaw = 0
+    throttle =0
+    hat=(0,0)
+
+    def hatdata(self):
+        self.hat = self.j.get_hat(0)
+
+    def update(self):
+        for event in pygame.event.get():
+            self.roll=self.j.get_axis(0)
+            self.pitch=self.j.get_axis(1)
+            self.yaw=self.j.get_axis(2)
+            self.throttle=self.j.get_axis(3)
+
+if(__name__=='__main__'):    
+    c1 = Extreme3dPro()
+    c1.detect_sticks()
+    c1.init(id=0)
+
+    while(0):
+        c1.update()
+        print(c1.roll)
+    
